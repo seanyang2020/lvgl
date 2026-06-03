@@ -13,6 +13,7 @@
 #include "lv_demo_widgets_profile.h"
 #include "lv_demo_widgets_analytics.h"
 #include "lv_demo_widgets_shop.h"
+#include "lv_demo_widgets_baidu_pan.h"
 
 #include "../../lvgl_private.h"
 
@@ -35,9 +36,10 @@ static void color_changer_create(lv_obj_t * parent);
 static void color_changer_event_cb(lv_event_t * e);
 static void color_event_cb(lv_event_t * e);
 static void scroll_anim_y_cb(void * var, int32_t v);
-static void scroll_anim_y_cb(void * var, int32_t v);
 static void slideshow_anim_completed_cb(lv_anim_t * a_old);
 static void tabview_delete_event_cb(lv_event_t * e);
+static void tabview_value_changed_cb(lv_event_t * e);
+static void slideshow_resume_cb(lv_timer_t * t);
 
 /**********************
  *  STATIC VARIABLES
@@ -71,11 +73,13 @@ void lv_demo_widgets_with_args(const lv_demo_args_t * args)
     tv = lv_tabview_create(args->parent);
     lv_tabview_set_tab_bar_size(tv, disp_size == DISP_LARGE ? 75 : 45);
     lv_obj_add_event_cb(tv, tabview_delete_event_cb, LV_EVENT_DELETE, NULL);
+    lv_obj_add_event_cb(tv, tabview_value_changed_cb, LV_EVENT_VALUE_CHANGED, NULL);
 
 
     lv_obj_t * t1 = lv_tabview_add_tab(tv, "Profile");
     lv_obj_t * t2 = lv_tabview_add_tab(tv, "Analytics");
     lv_obj_t * t3 = lv_tabview_add_tab(tv, "Shop");
+    lv_obj_t * t4 = lv_tabview_add_tab(tv, "BaiduPan");
 
     if(disp_size == DISP_LARGE) {
         lv_obj_t * tab_bar = lv_tabview_get_tab_bar(tv);
@@ -101,6 +105,7 @@ void lv_demo_widgets_with_args(const lv_demo_args_t * args)
     lv_demo_widgets_profile_create(t1);
     lv_demo_widgets_analytics_create(t2);
     lv_demo_widgets_shop_create(t3);
+    lv_demo_widgets_baidu_pan_create(t4);
 
     color_changer_create(tv);
 }
@@ -278,9 +283,16 @@ static void scroll_anim_y_cb(void * var, int32_t v)
     lv_obj_scroll_to_y(var, v, LV_ANIM_OFF);
 }
 
+/* ---- Slideshow pause support ---- */
+static volatile int slideshow_paused = 0;
+static lv_timer_t *slideshow_resume_timer = NULL;
+
 static void slideshow_anim_completed_cb(lv_anim_t * a_old)
 {
     LV_UNUSED(a_old);
+
+    /* Paused — don't advance to next tab */
+    if (slideshow_paused) return;
 
     lv_obj_t * cont = lv_tabview_get_content(tv);
     uint32_t tab_id = lv_tabview_get_tab_active(tv);
@@ -306,6 +318,52 @@ static void slideshow_anim_completed_cb(lv_anim_t * a_old)
     lv_anim_start(&a);
 }
 
+
+/** Resume the slideshow after pause timeout (called by timer) */
+static void slideshow_resume_cb(lv_timer_t *t)
+{
+    (void)t;
+    slideshow_paused = 0;
+    slideshow_resume_timer = NULL;
+
+    /* Kick off a fresh slideshow cycle */
+    lv_obj_t *cont = lv_tabview_get_content(tv);
+    uint32_t tab_id = lv_tabview_get_tab_active(tv);
+    lv_obj_t *tab = lv_obj_get_child(cont, tab_id);
+    lv_obj_scroll_to_y(tab, 0, LV_ANIM_OFF);
+    lv_obj_update_layout(tv);
+
+    int32_t v = lv_obj_get_scroll_bottom(tab);
+    uint32_t d = lv_anim_speed(lv_display_get_dpi(NULL));
+
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_exec_cb(&a, scroll_anim_y_cb);
+    lv_anim_set_duration(&a, d);
+    lv_anim_set_reverse_duration(&a, d);
+    lv_anim_set_values(&a, 0, v);
+    lv_anim_set_var(&a, tab);
+    lv_anim_set_completed_cb(&a, slideshow_anim_completed_cb);
+    lv_anim_start(&a);
+}
+
+/** User clicked a tab — pause slideshow for 5 minutes */
+static void tabview_value_changed_cb(lv_event_t *e)
+{
+    (void)e;
+    slideshow_paused = 1;
+
+    /* Cancel any existing resume timer */
+    if (slideshow_resume_timer) {
+        lv_timer_delete(slideshow_resume_timer);
+        slideshow_resume_timer = NULL;
+    }
+
+    /* Resume after 5 minutes */
+    slideshow_resume_timer = lv_timer_create(slideshow_resume_cb,
+                                              5 * 60 * 1000, NULL);
+    lv_timer_set_repeat_count(slideshow_resume_timer, 1);
+}
 
 static void tabview_delete_event_cb(lv_event_t * e)
 {
