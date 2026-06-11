@@ -696,6 +696,22 @@
         #endif
     #endif
 
+    /** Control of the cache support within NEMA GFX */
+    #ifndef LV_NEMA_USE_CACHE
+        #ifdef CONFIG_LV_NEMA_USE_CACHE
+            #define LV_NEMA_USE_CACHE CONFIG_LV_NEMA_USE_CACHE
+        #else
+            #define LV_NEMA_USE_CACHE 0
+        #endif
+    #endif
+    #ifndef LV_NEMA_CACHE_HAL_INCLUDE
+        #ifdef CONFIG_LV_NEMA_CACHE_HAL_INCLUDE
+            #define LV_NEMA_CACHE_HAL_INCLUDE CONFIG_LV_NEMA_CACHE_HAL_INCLUDE
+        #else
+            #define LV_NEMA_CACHE_HAL_INCLUDE <stm32u5xx_hal.h>
+        #endif
+    #endif
+
     /** Select which NemaGFX HAL to use. Possible options:
      * - LV_NEMA_HAL_CUSTOM
      * - LV_NEMA_HAL_STM32 */
@@ -1558,14 +1574,10 @@
  * When disabled the class check is skipped even if the class argument is supplied.
  * Requires LV_USE_CHECK_ARG to be enabled. */
 #ifndef LV_USE_CHECK_OBJ_CLASSTYPE
-    #ifdef LV_KCONFIG_PRESENT
-        #ifdef CONFIG_LV_USE_CHECK_OBJ_CLASSTYPE
-            #define LV_USE_CHECK_OBJ_CLASSTYPE CONFIG_LV_USE_CHECK_OBJ_CLASSTYPE
-        #else
-            #define LV_USE_CHECK_OBJ_CLASSTYPE 0
-        #endif
+    #ifdef CONFIG_LV_USE_CHECK_OBJ_CLASSTYPE
+        #define LV_USE_CHECK_OBJ_CLASSTYPE CONFIG_LV_USE_CHECK_OBJ_CLASSTYPE
     #else
-        #define LV_USE_CHECK_OBJ_CLASSTYPE 1
+        #define LV_USE_CHECK_OBJ_CLASSTYPE 0
     #endif
 #endif
 
@@ -1574,14 +1586,10 @@
  * if the associated argument is supplied.
  * Requires LV_USE_CHECK_ARG to be enabled. */
 #ifndef LV_USE_CHECK_OBJ_VALIDITY
-    #ifdef LV_KCONFIG_PRESENT
-        #ifdef CONFIG_LV_USE_CHECK_OBJ_VALIDITY
-            #define LV_USE_CHECK_OBJ_VALIDITY CONFIG_LV_USE_CHECK_OBJ_VALIDITY
-        #else
-            #define LV_USE_CHECK_OBJ_VALIDITY 0
-        #endif
+    #ifdef CONFIG_LV_USE_CHECK_OBJ_VALIDITY
+        #define LV_USE_CHECK_OBJ_VALIDITY CONFIG_LV_USE_CHECK_OBJ_VALIDITY
     #else
-        #define LV_USE_CHECK_OBJ_VALIDITY 1
+        #define LV_USE_CHECK_OBJ_VALIDITY 0
     #endif
 #endif
 
@@ -4961,6 +4969,10 @@ LV_EXPORT_CONST_INT(LV_DRAW_BUF_ALIGN);
 
 #ifndef LV_USE_VG_LITE_THORVG
     #define LV_USE_VG_LITE_THORVG 0
+#endif
+
+#ifndef LV_NEMA_USE_CACHE
+    #define LV_NEMA_USE_CACHE 0
 #endif
 
 /* Set some defines if a dependency is disabled. */
