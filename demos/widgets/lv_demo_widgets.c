@@ -15,6 +15,10 @@
 #include "lv_demo_widgets_shop.h"
 #include "lv_demo_widgets_baidu_pan.h"
 
+#if LV_USE_JS_ENGINE
+#include "src/js_engine/js_tab.h"
+#endif
+
 #include "../../lvgl_private.h"
 
 #if LV_USE_STDLIB_MALLOC == LV_STDLIB_BUILTIN && LV_MEM_SIZE < (38ul * 1024ul)
@@ -80,6 +84,9 @@ void lv_demo_widgets_with_args(const lv_demo_args_t * args)
     lv_obj_t * t2 = lv_tabview_add_tab(tv, "Analytics");
     lv_obj_t * t3 = lv_tabview_add_tab(tv, "Shop");
     lv_obj_t * t4 = lv_tabview_add_tab(tv, "BaiduPan");
+#if LV_USE_JS_ENGINE
+    lv_obj_t * t5 = lv_tabview_add_tab(tv, "JS-Apps");
+#endif
 
     if(disp_size == DISP_LARGE) {
         lv_obj_t * tab_bar = lv_tabview_get_tab_bar(tv);
@@ -106,6 +113,9 @@ void lv_demo_widgets_with_args(const lv_demo_args_t * args)
     lv_demo_widgets_analytics_create(t2);
     lv_demo_widgets_shop_create(t3);
     lv_demo_widgets_baidu_pan_create(t4);
+#if LV_USE_JS_ENGINE
+    lv_js_tab_create(t5);
+#endif
 
     color_changer_create(tv);
 }
