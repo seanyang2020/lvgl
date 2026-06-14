@@ -58,7 +58,7 @@ void lv_demo_widgets_components_init(void)
 #endif
 
     if(LV_HOR_RES <= 320) disp_size = DISP_SMALL;
-    else if(LV_HOR_RES < 720) disp_size = DISP_MEDIUM;
+    else if(LV_HOR_RES < 900) disp_size = DISP_MEDIUM;
     else disp_size = DISP_LARGE;
 
     font_large = LV_FONT_DEFAULT;

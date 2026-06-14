@@ -363,6 +363,11 @@ static void tabview_value_changed_cb(lv_event_t *e)
     (void)e;
     slideshow_paused = 1;
 
+#if LV_USE_JS_ENGINE
+    /* Refresh JS app list when switching to JS-Apps tab (index 4) */
+    if (lv_tabview_get_tab_active(tv) == 4) lv_js_tab_refresh();
+#endif
+
     /* Cancel any existing resume timer */
     if (slideshow_resume_timer) {
         lv_timer_delete(slideshow_resume_timer);
