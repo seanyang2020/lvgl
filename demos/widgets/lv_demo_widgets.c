@@ -19,6 +19,10 @@
 #include "src/js_engine/js_tab.h"
 #endif
 
+#if LV_USE_JS_LOADER
+#include "src/js_loader/js_loader_tab.h"
+#endif
+
 #include "src/lib/config_util.h"
 #include <string.h>
 
@@ -54,7 +58,10 @@ static void slideshow_resume_cb(lv_timer_t * t);
 
 /* Config-driven: set during lv_demo_widgets_with_args, read by slideshow */
 static int  g_tab_count         = 5;
-static int  g_js_apps_tab_idx   = 0;
+static int  g_js_apps_tab_idx    = 0;
+#if LV_USE_JS_LOADER
+static int  g_jsloader_tab_idx   = -1;
+#endif
 static int  g_tab_pause_ms      = 5 * 60 * 1000;  /* pause after user click */
 static bool g_tab_cycle         = true;
 
@@ -102,6 +109,11 @@ static lv_obj_t * create_tab_content(const char * name, lv_obj_t * page)
         lv_js_tab_create(page);
     }
 #endif
+#if LV_USE_JS_LOADER
+    else if (strcmp(name, "JS-Loader") == 0) {
+        js_loader_tab_create(page);
+    }
+#endif
     else {
         LV_LOG_WARN("Unknown tab name '%s' — skipped", name);
         return NULL;
@@ -126,7 +138,7 @@ void lv_demo_widgets_with_args(const lv_demo_args_t * args)
 
     /* ---- Determine tab order ---- */
     static const char * DEFAULT_ORDER[] = {
-        "JS-Apps", "Profile", "Analytics", "Shop", "BaiduPan"
+        "JS-Apps", "JS-Loader", "Profile", "Analytics", "Shop", "BaiduPan"
     };
     #define DEFAULT_ORDER_COUNT 5
 
@@ -181,6 +193,9 @@ void lv_demo_widgets_with_args(const lv_demo_args_t * args)
 
     /* Create tabs in configured order, building content only for known tabs */
     g_js_apps_tab_idx = -1;
+#if LV_USE_JS_LOADER
+    g_jsloader_tab_idx = -1;
+#endif
     g_tab_count = 0;
 
     for (int i = 0; i < order_count; i++) {
@@ -189,6 +204,11 @@ void lv_demo_widgets_with_args(const lv_demo_args_t * args)
             if (strcmp(order_names[i], "JS-Apps") == 0) {
                 g_js_apps_tab_idx = g_tab_count;
             }
+#if LV_USE_JS_LOADER
+            if (strcmp(order_names[i], "JS-Loader") == 0) {
+                g_jsloader_tab_idx = g_tab_count;
+            }
+#endif
             g_tab_count++;
         }
     }
@@ -475,6 +495,13 @@ static void tabview_value_changed_cb(lv_event_t *e)
     /* Refresh JS app list when switching to JS-Apps tab */
     if (g_js_apps_tab_idx >= 0 &&
         (int)lv_tabview_get_tab_active(tv) == g_js_apps_tab_idx) {
+        lv_js_tab_refresh();
+    }
+#endif
+#if LV_USE_JS_LOADER
+    /* Refresh jsloader app list when switching to JS-Loader tab */
+    if (g_jsloader_tab_idx >= 0 &&
+        (int)lv_tabview_get_tab_active(tv) == g_jsloader_tab_idx) {
         lv_js_tab_refresh();
     }
 #endif
