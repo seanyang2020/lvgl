@@ -19,6 +19,9 @@
 #include "src/js_engine/js_tab.h"
 #endif
 
+#include "src/lib/config_util.h"
+#include <string.h>
+
 #include "../../lvgl_private.h"
 
 #if LV_USE_STDLIB_MALLOC == LV_STDLIB_BUILTIN && LV_MEM_SIZE < (38ul * 1024ul)
@@ -49,6 +52,12 @@ static void slideshow_resume_cb(lv_timer_t * t);
  *  STATIC VARIABLES
  **********************/
 
+/* Config-driven: set during lv_demo_widgets_with_args, read by slideshow */
+static int  g_tab_count         = 5;
+static int  g_js_apps_tab_idx   = 0;
+static int  g_tab_pause_ms      = 5 * 60 * 1000;  /* pause after user click */
+static bool g_tab_cycle         = true;
+
 /**********************
  *  GLOBAL VARIABLES
  **********************/
@@ -69,24 +78,123 @@ void lv_demo_widgets(void)
     lv_demo_widgets_with_args(&args);
 }
 
+/**
+ * Create content for a named tab page.
+ * Returns the page on success, NULL if the tab name is unknown
+ * or the feature is disabled (e.g. JS-Apps without LV_USE_JS_ENGINE).
+ */
+static lv_obj_t * create_tab_content(const char * name, lv_obj_t * page)
+{
+    if (strcmp(name, "Profile") == 0) {
+        lv_demo_widgets_profile_create(page);
+    }
+    else if (strcmp(name, "Analytics") == 0) {
+        lv_demo_widgets_analytics_create(page);
+    }
+    else if (strcmp(name, "Shop") == 0) {
+        lv_demo_widgets_shop_create(page);
+    }
+    else if (strcmp(name, "BaiduPan") == 0) {
+        lv_demo_widgets_baidu_pan_create(page);
+    }
+#if LV_USE_JS_ENGINE
+    else if (strcmp(name, "JS-Apps") == 0) {
+        lv_js_tab_create(page);
+    }
+#endif
+    else {
+        LV_LOG_WARN("Unknown tab name '%s' — skipped", name);
+        return NULL;
+    }
+    return page;
+}
+
 void lv_demo_widgets_with_args(const lv_demo_args_t * args)
 {
     LV_ASSERT_NULL(args);
 
+    /* ---- Read config-entry.json ---- */
+    char * cfg_path = config_find("config/config-entry.json",
+                                   "/data/config/config-entry.json");
+    cJSON * cfg = cfg_path ? config_json_read(cfg_path) : NULL;
+
+    if (cfg_path) {
+        LV_LOG_USER("[demo] config found: %s", cfg_path);
+    } else {
+        LV_LOG_USER("[demo] no config-entry.json, using defaults");
+    }
+
+    /* ---- Determine tab order ---- */
+    static const char * DEFAULT_ORDER[] = {
+        "JS-Apps", "Profile", "Analytics", "Shop", "BaiduPan"
+    };
+    #define DEFAULT_ORDER_COUNT 5
+
+    const char ** order_names = DEFAULT_ORDER;
+    int order_count = DEFAULT_ORDER_COUNT;
+
+    /* Allocate space for config-driven names (max 16 tabs) */
+    const char * cfg_names[16];
+    int cfg_count = 0;
+
+    cJSON * order_arr = cfg
+        ? cJSON_GetObjectItemCaseSensitive(cfg, "tab_order")
+        : NULL;
+
+    if (cJSON_IsArray(order_arr) && cJSON_GetArraySize(order_arr) > 0) {
+        int n = cJSON_GetArraySize(order_arr);
+        if (n > 16) n = 16;
+        for (int i = 0; i < n; i++) {
+            cJSON * item = cJSON_GetArrayItem(order_arr, i);
+            if (!cJSON_IsString(item)) continue;
+
+            const char * name = item->valuestring;
+            /* Dedup: skip if already added */
+            bool dup = false;
+            for (int j = 0; j < cfg_count; j++) {
+                if (strcmp(cfg_names[j], name) == 0) { dup = true; break; }
+            }
+            if (dup) continue;
+
+            cfg_names[cfg_count++] = name;
+        }
+        if (cfg_count > 0) {
+            order_names = cfg_names;
+            order_count = cfg_count;
+        }
+    }
+
+    /* Read slideshow settings */
+    g_tab_cycle = config_get_bool(cfg, "tab_cycle", true);
+    int cycle_interval = config_get_int(cfg, "tab_cycle_interval", 5000);
+    if (cycle_interval <= 0) cycle_interval = 5000;
+    /* Pause after user click uses 1/3 of the cycle interval, min 30s */
+    g_tab_pause_ms = cycle_interval * 100;
+    if (g_tab_pause_ms < 30000) g_tab_pause_ms = 30000;
+
+    /* ---- Build UI ---- */
     lv_demo_widgets_components_init();
     tv = lv_tabview_create(args->parent);
     lv_tabview_set_tab_bar_size(tv, disp_size == DISP_LARGE ? 75 : 45);
     lv_obj_add_event_cb(tv, tabview_delete_event_cb, LV_EVENT_DELETE, NULL);
     lv_obj_add_event_cb(tv, tabview_value_changed_cb, LV_EVENT_VALUE_CHANGED, NULL);
 
+    /* Create tabs in configured order, building content only for known tabs */
+    g_js_apps_tab_idx = -1;
+    g_tab_count = 0;
 
-    lv_obj_t * t1 = lv_tabview_add_tab(tv, "Profile");
-    lv_obj_t * t2 = lv_tabview_add_tab(tv, "Analytics");
-    lv_obj_t * t3 = lv_tabview_add_tab(tv, "Shop");
-    lv_obj_t * t4 = lv_tabview_add_tab(tv, "BaiduPan");
-#if LV_USE_JS_ENGINE
-    lv_obj_t * t5 = lv_tabview_add_tab(tv, "JS-Apps");
-#endif
+    for (int i = 0; i < order_count; i++) {
+        lv_obj_t * page = lv_tabview_add_tab(tv, order_names[i]);
+        if (create_tab_content(order_names[i], page) != NULL) {
+            if (strcmp(order_names[i], "JS-Apps") == 0) {
+                g_js_apps_tab_idx = g_tab_count;
+            }
+            g_tab_count++;
+        }
+    }
+
+    LV_LOG_USER("[demo] %d tabs created, JS-Apps at index %d",
+                g_tab_count, g_js_apps_tab_idx);
 
     if(disp_size == DISP_LARGE) {
         lv_obj_t * tab_bar = lv_tabview_get_tab_bar(tv);
@@ -109,20 +217,20 @@ void lv_demo_widgets_with_args(const lv_demo_args_t * args)
         lv_obj_align_to(label, logo, LV_ALIGN_OUT_RIGHT_BOTTOM, 10, 0);
     }
 
-    lv_demo_widgets_profile_create(t1);
-    lv_demo_widgets_analytics_create(t2);
-    lv_demo_widgets_shop_create(t3);
-    lv_demo_widgets_baidu_pan_create(t4);
-#if LV_USE_JS_ENGINE
-    lv_js_tab_create(t5);
-#endif
-
     color_changer_create(tv);
+
+    /* Cleanup config */
+    if (cfg) cJSON_Delete(cfg);
+    free(cfg_path);
 }
 
 
 void lv_demo_widgets_start_slideshow(void)
 {
+    if (!g_tab_cycle) {
+        LV_LOG_USER("[demo] slideshow disabled (tab_cycle=false)");
+        return;
+    }
     lv_obj_update_layout(tv);
 
     lv_obj_t * cont = lv_tabview_get_content(tv);
@@ -307,7 +415,7 @@ static void slideshow_anim_completed_cb(lv_anim_t * a_old)
     lv_obj_t * cont = lv_tabview_get_content(tv);
     uint32_t tab_id = lv_tabview_get_tab_active(tv);
     tab_id += 1;
-    if(tab_id > 2) tab_id = 0;
+    if (tab_id >= (uint32_t)g_tab_count) tab_id = 0;
     lv_tabview_set_active(tv, tab_id, LV_ANIM_ON);
 
     lv_obj_t * tab = lv_obj_get_child(cont, tab_id);
@@ -357,15 +465,18 @@ static void slideshow_resume_cb(lv_timer_t *t)
     lv_anim_start(&a);
 }
 
-/** User clicked a tab — pause slideshow for 5 minutes */
+/** User clicked a tab — pause slideshow */
 static void tabview_value_changed_cb(lv_event_t *e)
 {
     (void)e;
     slideshow_paused = 1;
 
 #if LV_USE_JS_ENGINE
-    /* Refresh JS app list when switching to JS-Apps tab (index 4) */
-    if (lv_tabview_get_tab_active(tv) == 4) lv_js_tab_refresh();
+    /* Refresh JS app list when switching to JS-Apps tab */
+    if (g_js_apps_tab_idx >= 0 &&
+        (int)lv_tabview_get_tab_active(tv) == g_js_apps_tab_idx) {
+        lv_js_tab_refresh();
+    }
 #endif
 
     /* Cancel any existing resume timer */
@@ -374,9 +485,9 @@ static void tabview_value_changed_cb(lv_event_t *e)
         slideshow_resume_timer = NULL;
     }
 
-    /* Resume after 5 minutes */
+    /* Resume after configured pause duration */
     slideshow_resume_timer = lv_timer_create(slideshow_resume_cb,
-                                              5 * 60 * 1000, NULL);
+                                              (uint32_t)g_tab_pause_ms, NULL);
     lv_timer_set_repeat_count(slideshow_resume_timer, 1);
 }
 
