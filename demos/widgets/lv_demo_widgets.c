@@ -499,10 +499,16 @@ static void tabview_value_changed_cb(lv_event_t *e)
     }
 #endif
 #if LV_USE_JS_LOADER
-    /* Refresh jsloader app list when switching to JS-Loader tab */
+    /* Re-enter JS launcher when switching to JS-Loader tab.
+     * jsloader_create_ui() handles re-entry internally:
+     *   running → reuse screen;  exited → auto-restart */
     if (g_jsloader_tab_idx >= 0 &&
         (int)lv_tabview_get_tab_active(tv) == g_jsloader_tab_idx) {
-        lv_js_tab_refresh();
+        lv_obj_t * content = lv_tabview_get_content(tv);
+        if (content) {
+            lv_obj_t * page = lv_obj_get_child(content, g_jsloader_tab_idx);
+            jsloader_create_ui(page);
+        }
     }
 #endif
 
