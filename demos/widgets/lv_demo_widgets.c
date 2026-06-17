@@ -138,9 +138,9 @@ void lv_demo_widgets_with_args(const lv_demo_args_t * args)
 
     /* ---- Determine tab order ---- */
     static const char * DEFAULT_ORDER[] = {
-        "JS-Loader", "JS-Apps", "Profile", "Analytics", "Shop", "BaiduPan"
+        "JS-Loader", "Profile", "Analytics", "Shop", "BaiduPan"
     };
-    #define DEFAULT_ORDER_COUNT 6
+    #define DEFAULT_ORDER_COUNT 5
 
     const char ** order_names = DEFAULT_ORDER;
     int order_count = DEFAULT_ORDER_COUNT;
