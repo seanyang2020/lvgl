@@ -104,7 +104,7 @@ static lv_obj_t * create_tab_content(const char * name, lv_obj_t * page)
     else if (strcmp(name, "BaiduPan") == 0) {
         lv_demo_widgets_baidu_pan_create(page);
     }
-#if LV_USE_JS_ENGINE
+#if LV_USE_JS_ENGINE && !LV_USE_JS_LOADER
     else if (strcmp(name, "JS-Apps") == 0) {
         lv_js_tab_create(page);
     }
@@ -138,7 +138,7 @@ void lv_demo_widgets_with_args(const lv_demo_args_t * args)
 
     /* ---- Determine tab order ---- */
     static const char * DEFAULT_ORDER[] = {
-        "JS-Apps", "JS-Loader", "Profile", "Analytics", "Shop", "BaiduPan"
+        "JS-Loader", "Profile", "Analytics", "Shop", "BaiduPan"
     };
     #define DEFAULT_ORDER_COUNT 5
 
